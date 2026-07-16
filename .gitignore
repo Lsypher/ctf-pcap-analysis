@@ -1,0 +1,12 @@
+# 临时文件
+*.pcap
+*.pcapng
+*.bin
+*.log
+/tmp/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

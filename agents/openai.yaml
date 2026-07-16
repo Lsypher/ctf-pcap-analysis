@@ -1,0 +1,4 @@
+interface:
+  display_name: "CTF PCAP 流量分析"
+  short_description: "用 tshark/Wireshark 分析 pcap 取证与 CTF"
+  default_prompt: "用 $ctf-pcap-analysis 分析这个抓包文件，找出可疑流量、提取传输的文件或 flag。"
