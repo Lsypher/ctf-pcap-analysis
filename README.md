@@ -19,6 +19,19 @@ CTF / 取证 PCAP 流量分析 skill，用于 [opencode](https://opencode.ai) CL
 git clone https://github.com/Lsypher/ctf-pcap-analysis.git ~/.opencode/skills/ctf-pcap-analysis
 ```
 
+## 注意
+
+现代 CTF 题目往往不是纯粹的流量分析，更像"脑筋急转弯"。本 skill 能帮你完成流量层面的工作（提取文件、解码数据、还原通信内容），但 **flag 通常不会直接以明文形式出现**。你可能还需要：
+
+- Base64 / Base32 解码
+- AES / DES / XOR 解密
+- CRC32 / MD5 / SHA 校验
+- 字符串拼接、移位、反转
+- 图片隐写、QR 码识别
+- 二进制逆向、编程脚本处理
+
+把流量中提取到的"半成品"当作线索，结合其他工具和思路才能拿到最终 flag。
+
 ## 使用
 
 安装后在 opencode 中直接使用，例如：
