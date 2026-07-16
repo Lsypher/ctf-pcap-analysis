@@ -16,8 +16,11 @@ CTF / 取证 PCAP 流量分析 skill，用于 [opencode](https://opencode.ai) CL
 
 ```bash
 # 克隆到 opencode skills 目录
+# 路径: ~/.opencode/skills/
 git clone https://github.com/Lsypher/ctf-pcap-analysis.git ~/.opencode/skills/ctf-pcap-analysis
 ```
+
+安装后的完整路径为 `~/.opencode/skills/ctf-pcap-analysis/`，opencode 会自动加载该目录下的 skill。
 
 ## 注意
 
