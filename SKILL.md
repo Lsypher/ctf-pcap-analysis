@@ -135,6 +135,114 @@ frame contains "flag{"                # CTF flag pattern
 tcp contains "admin"                  # search in TCP payload
 ```
 
+### Artifact Presentation Rules
+
+**核心原则：AI 禁止自行选定唯一答案。所有可疑结果必须全部列出，由用户判断。**
+
+AI 分析 PCAP 后，必须主动展示以下内容给用户：
+
+- 所有提取的文件（路径 + SHA256）
+- **所有**可疑字符串（从 follow stream、DNS query、HTTP body 等中提取），不得遗漏
+- 所有需要用户进一步解码/处理的半成品（附带编码类型判断）
+
+---
+#### 强制性要求（违反即视为无效分析）
+
+1. **逐消息类型提取**：必须按协议中每个不同的消息类型/阶段分别提取可读字符串，不得跳过任何类型。例如自定义 UDP 协议中 type 0x00、type 0x01、type 0x02 等各自 payload 中的 ASCII 字符串都要单独列出。
+
+2. **精确标注来源**：每条候选必须包含：
+   - 帧号（frame number）
+   - 消息类型 / 协议阶段
+   - 在 payload 中的偏移位置（hex offset）
+   - 字符串长度
+   - 所属通信方向（谁→谁）
+
+3. **排除说明**：如果某个可读字符串被判断为"无关"而未列入候选，必须在输出中说明排除理由（如"该值在所有会话中相同，属于协议固定标识"等）。
+
+4. **结尾声明**：最终回复必须以 `以上共 N 个候选，请用户判断最终答案。` 结尾，不得附加任何暗示性结论。
+
+#### 展示格式
+
+每条候选必须严格按以下格式输出：
+
+```
+[置信度] <值>
+  → 帧号: <number>
+  → 方向: <src> → <dst>
+  → 消息类型: <type>
+  → payload 偏移: <offset>
+  → 长度: <length> 字节
+  → 原始 hex: <hex dump>
+  → 可能含义: <分析>
+  → 建议: <下一步操作>
+```
+
+**置信度分级规则：**
+- `HIGH`：语义明确（如 flag 格式匹配、已知协议字段、可解码为有意义内容）
+- `MEDIUM`：格式可疑（如特定长度、base64 特征、协议关键字段位置）
+- `LOW`：仅因是可读 ASCII 而列入，无其他上下文支持
+
+#### 示例（以自定义 UDP 协议为例）
+
+```
+[MEDIUM] uU1vUKcSzuCcF6mylNpNTPoPngRP5G7t
+  → 帧号: 18215
+  → 方向: 172.18.0.125 → 172.18.0.1
+  → 消息类型: 0x00（初始握手）
+  → payload 偏移: 0x14（魔数 P05= 之后）
+  → 长度: 32 字节
+  → 原始 hex: 75553176554b63537a75436346366d796c4e704e54506f506e67525035473774
+  → 可能含义: 会话密钥 / 客户端标识
+  → 建议: 尝试作为 flag 直接提交，或检查是否可解码
+
+[MEDIUM] DtX0GScM9dwrgZht
+  → 帧号: 18217
+  → 方向: 172.18.0.125 → 172.18.0.1
+  → 消息类型: 0x01（认证）
+  → payload 偏移: 0x15（0xff 前缀字节之后）
+  → 长度: 16 字节
+  → 原始 hex: 447458304753634d39647772675a6874
+  → 可能含义: 会话密钥 / 认证令牌
+  → 建议: 尝试作为 flag 直接提交，或检查是否可解码
+
+→ 两个可疑候选均来自攻击者流量，请用户判断哪个是答案
+```
+
+**注意**：上例中 type 字段（0x00/0x01）、偏移值、帧号均为占位，实际分析时需从抓包中精确提取。
+
+---
+#### 隐式 flag 处理（无 flag{} 包裹时）
+
+当 flag 没有明确格式时，必须：
+
+1. 分析协议每个消息类型的 payload，逐字节提取 ASCII 可读范围（0x20-0x7e）的连续字符串
+2. 提取所有协议数据阶段的明文可读字符串，无论其看起来是否"像 flag"
+3. 禁止因"看起来像随机数据"或"长度不对"而跳过某个候选
+4. 每条候选标注其协议阶段、消息类型、方向、帧号
+
+#### 输出前自检清单
+
+AI 在给出最终答案前，必须逐一核对以下清单，核对过程不在回复中展示：
+
+```
+☐ 是否从每个不同的消息类型/协议阶段中都提取了可读字符串？
+☐ 是否遍历了攻击者相关的所有帧，而非仅查看前几帧？
+☐ 是否提取了每个消息类型中所有可变长度的字段值？
+☐ 所有候选是否都标注了帧号和来源偏移？
+☐ 是否有可读字符串被遗漏？如有，是否已说明排除理由？
+☐ 是否明确请求用户做出最终判断？
+☐ 是否未在回复中暗示或引导用户选择特定答案？
+```
+
+**自检全部通过后方可输出最终回复。**
+
+#### flag 搜索策略
+- 向用户确认 flag 格式（如 `flag{}`、`CTF{}`、`key{}` 或其他）
+- 用用户提供的格式搜索，同时用 `frame contains "flag"` 做宽泛兜底
+- 对可疑字段尝试 base64/hex/rot13 解码后再搜索
+- 对无明确格式的隐式 flag，将所有可疑字符串全部列出，标注来源和可能用途
+- **AI 不做最终判定，永远把选择权交给用户**
+
 ---
 
 ## 3. PROTOCOL ANALYSIS
@@ -379,8 +487,16 @@ PCAP file for analysis
 │   ├── High volume to single external IP → data exfil (§4)
 │   └── Encrypted traffic without SNI → suspicious tunnel
 │
-└── Need automated extraction?
-    ├── NetworkMiner (GUI, optional): sudo apt install networkminer → auto-extracts Files/Credentials/Sessions/DNS
-    ├── tshark --export-objects for HTTP/SMB/TFTP files (§4/§6)
-    └── binwalk/foremost on exported streams (§4)
+├── Need automated extraction?
+│   ├── NetworkMiner (GUI, optional): sudo apt install networkminer → auto-extracts Files/Credentials/Sessions/DNS
+│   ├── tshark --export-objects for HTTP/SMB/TFTP files (§4/§6)
+│   └── binwalk/foremost on exported streams (§4)
+│
+└── Found suspicious data?
+    ├── User provided flag format? → Search with that format + wide "flag" search
+    ├── Looks encoded (base64/hex)? → Decode from stream, show result
+    ├── Partial match in DNS/HTTP payload? → Extract full context, show candidate
+    ├── Custom/unknown protocol? → 按消息类型逐类型提取所有可读 ASCII 字符串作为候选
+    ├── 执行输出前自检清单（Artifact Presentation Rules 中有详细清单）
+    └── 按 Artifact Presentation Rules 的展示格式列出 ALL candidates，请求用户判断
 ```
